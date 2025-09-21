@@ -1,8 +1,45 @@
-# Geological 3D Grid Generator
+# Telesto - Advanced 3D Geological Grid Generator
 
-A professional React-based web application for generating and visualizing 3D geological grids from horizon and fault surface data. This tool supports advanced geological modeling with realistic fault handling, block joining, customizable visualizations, and export capabilities.
+A professional-grade geological subsurface modeling tool built with React and modern web technologies. Generate complex 3D geological grids with realistic fault handling, horizon interpolation, and advanced visualization capabilities.
+
+## 🚀 Features
+
+### Core Geological Capabilities
+
+- **Multi-Horizon Processing**: Import and process multiple geological horizon surfaces
+- **Advanced Fault Modeling**: Complex multi-fault systems with realistic displacement
+- **Intelligent Interpolation**: Multiple algorithms including linear, kriging, and IDW
+- **Iso-proportionate Layering**: Geologically consistent layer generation
+- **Property Modeling**: Porosity, permeability, and facies distribution
+
+### Technical Features
+
+- **Modern React Architecture**: Modular, maintainable component structure
+- **State Management**: Zustand with Immer for predictable state updates
+- **Performance Optimized**: Efficient 3D rendering with requestAnimationFrame
+- **Error Handling**: Comprehensive error boundaries and user feedback
+- **TypeScript Ready**: Full type definitions for development productivity
+- **Responsive Design**: Works on desktop and tablet devices
+
+### Data Import/Export
+
+- **CSV Import**: Flexible CSV parsing with validation
+- **Sample Data Generation**: Built-in geological data generators for testing
+- **Multiple Export Formats**: CSV, JSON, and Petrel-compatible outputs
+- **Data Validation**: Comprehensive input validation and error reporting
+
+## 🛠️ Technology Stack
+
+- **Frontend**: React 19.1.1 with Hooks and Context
+- **Build Tool**: Vite 7.1.6 with Hot Module Replacement
+- **Styling**: Tailwind CSS 3.4.17 with custom geological themes
+- **State Management**: Zustand with Immer for immutable updates
+- **UI Components**: Lucide React icons, Framer Motion animations
+- **Notifications**: React Hot Toast for user feedback
+- **Development**: TypeScript support with comprehensive type definitions
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [Features](#features)
 - [Installation](#installation)
@@ -12,9 +49,11 @@ A professional React-based web application for generating and visualizing 3D geo
 - [License](#license)
 
 ## Overview
+
 The Geological 3D Grid Generator is a powerful tool for geoscientists and reservoir engineers to create 3D subsurface models from horizon and fault data. Built with React and Tailwind CSS, it provides an interactive interface for uploading CSV data, generating grids with geological properties (e.g., porosity, permeability), visualizing results in 3D, and exporting models for further analysis. The application supports block selection and joining, multiple color schemes, and performance optimizations for handling large datasets.
 
 ## Features
+
 - **Data Input**: Upload horizon and fault surfaces in CSV format or generate realistic sample data.
 - **3D Grid Generation**: Create layered geological grids with properties like bulk volume, porosity, permeability, saturation, and structural dip.
 - **Block Joining**: Select and join grid blocks to represent geological features or reservoir compartments.
@@ -25,37 +64,48 @@ The Geological 3D Grid Generator is a powerful tool for geoscientists and reserv
 - **User-Friendly Interface**: Intuitive controls, progress feedback, and real-time visualization updates.
 
 ## Installation
+
 To run the Geological 3D Grid Generator locally, follow these steps:
 
 ### Prerequisites
+
 - Node.js (v16 or higher)
 - npm or yarn
 - A modern web browser (Chrome, Firefox, Edge)
 
 ### Steps
+
 1. **Clone the Repository**:
+
    ```bash
    git clone https://github.com/your-username/geological-3d-grid-generator.git
    cd geological-3d-grid-generator
    ```
 
 2. **Install Dependencies**:
+
    ```bash
    npm install
    ```
+
    or
+
    ```bash
    yarn install
    ```
 
 3. **Start the Development Server**:
+
    ```bash
    npm start
    ```
+
    or
+
    ```bash
    yarn start
    ```
+
    This will launch the application at `http://localhost:3000`.
 
 4. **Build for Production** (optional):
@@ -65,31 +115,37 @@ To run the Geological 3D Grid Generator locally, follow these steps:
    Serve the `build` directory using a static server (e.g., `npx serve -s build`).
 
 ### Dependencies
+
 - React (`react`, `react-dom`)
 - Lucide Icons (`lucide-react`) for UI icons
 - Tailwind CSS for styling
 
 ## Usage
+
 1. **Launch the Application**:
    Open the application in your browser (`http://localhost:3000` or the deployed URL).
 
 2. **Upload Data**:
+
    - Navigate to the "Data Upload" section.
    - Upload horizon and fault CSV files (see [File Format Requirements](#file-format-requirements)).
    - Alternatively, use the "Sample Data" buttons to generate realistic horizons and faults.
 
 3. **Configure Parameters**:
+
    - Set the number of layers (2–25) using the slider.
    - Choose a view mode (3D Blocks, Point Cloud, Wireframe).
    - Toggle visibility of faults and wells.
    - Select a color scheme or customize colors in the "Color Schemes" section.
 
 4. **Generate Grid**:
+
    - Click "Generate Advanced Grid" to create the 3D grid.
    - Monitor progress via the loading overlay and progress bar.
    - If generation takes too long, try increasing grid spacing or reducing layers.
 
 5. **Visualize and Interact**:
+
    - Use the mouse to rotate (drag), pan (Shift+drag), or zoom (scroll).
    - Enable "Joining Mode" to select and join grid blocks by clicking them.
    - Reset the view or toggle visualization visibility as needed.
@@ -98,9 +154,11 @@ To run the Geological 3D Grid Generator locally, follow these steps:
    - Click "Export Advanced Grid" to download the grid as a CSV file, including geological properties and joined block information.
 
 ## File Format Requirements
+
 The application accepts CSV files for horizons and faults with the following formats:
 
 ### Horizon CSV
+
 - **Columns**: Must include X, Y, Z coordinates (case-insensitive).
 - **Example**:
   ```
@@ -115,6 +173,7 @@ The application accepts CSV files for horizons and faults with the following for
   - At least two horizon files (top and bottom surfaces) are required for grid generation.
 
 ### Fault CSV
+
 - **Columns**: Must include X, Y, Z coordinates and an optional `SegId` (segment identifier) for fault classification.
 - **Example**:
   ```
@@ -129,24 +188,29 @@ The application accepts CSV files for horizons and faults with the following for
   - Fault data is optional but enhances grid realism.
 
 ### Tips
+
 - Ensure coordinates are numeric and in a consistent unit system (e.g., meters).
 - Remove empty lines or invalid rows to prevent parsing errors.
 - Use sample data generation to test the application with valid inputs.
 
 ## Contributing
+
 Contributions are welcome! To contribute:
 
 1. **Fork the Repository**:
+
    ```bash
    git clone https://github.com/your-username/geological-3d-grid-generator.git
    ```
 
 2. **Create a Feature Branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 3. **Make Changes**:
+
    - Follow the existing code style (ESLint and Prettier recommended).
    - Add tests for new features using a testing framework like Jest.
    - Update this README if new features or requirements are added.
@@ -156,11 +220,13 @@ Contributions are welcome! To contribute:
    - Open a pull request with a clear description of the changes and their purpose.
 
 ### Development Tips
+
 - **Performance**: Optimize heavy computations (e.g., grid generation) using Web Workers or spatial indexing.
 - **Testing**: Test with large datasets to ensure performance and stability.
 - **Issues**: Check the GitHub Issues tab for known bugs or feature requests.
 
 ## License
+
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---

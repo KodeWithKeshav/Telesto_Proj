@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Download, Play, Settings, Eye, EyeOff, RotateCw, Zap, FileText, Layers, Box, Grid, Info } from 'lucide-react';
 
 const Geological3DGridTool = () => {
+  console.log('Geological3DGridTool component starting...');
+  
   const [horizonData, setHorizonData] = useState([]);
   const [faultData, setFaultData] = useState([]);
   const [numLayers, setNumLayers] = useState(5);
@@ -22,6 +24,8 @@ const Geological3DGridTool = () => {
   });
   const [isDragging, setIsDragging] = useState(false);
   const [lastMouse, setLastMouse] = useState({ x: 0, y: 0 });
+
+  console.log('State initialized, setting up component...');
 
   // File upload handlers
   const parseCSVData = (csvText, type) => {
