@@ -40,6 +40,10 @@ const Geological3DGridTool = () => {
   const [selectedGrids, setSelectedGrids] = useState(new Set());
   const [mergeDirection, setMergeDirection] = useState('vertical'); // 'vertical', 'horizontal'
 
+  // New state for slicing
+  const [sliceEnabled, setSliceEnabled] = useState({ x: false, y: false, z: false });
+  const [slicePosition, setSlicePosition] = useState({ x: 0.5, y: 0.5, z: 0.5 }); // Normalized 0-1
+
   // Get current active grid
   const activeGrid = useMemo(() => {
     return grids.find(g => g.id === activeGridId);
@@ -349,33 +353,72 @@ const Geological3DGridTool = () => {
     }
   }, [horizonData, faultData, numLayers, geologicalInterpolation, calculateAdvancedFaultInfluence, grids.length]);
 
-  // Grid combination functionality
+  // Enhanced compatibility checker
   const canCombineGrids = useCallback((gridIds) => {
-    if (gridIds.length < 2) return { canCombine: false, reason: 'Need at least 2 grids' };
+    if (gridIds.length < 2) return { canCombine: false, reason: 'Need at least 2 grids', details: [] };
     
     const selectedGridData = gridIds.map(id => grids.find(g => g.id === id));
     
-    // Check bounds compatibility
+    const details = [];
+    
+    // Check spatial bounds compatibility
     const firstBounds = selectedGridData[0].bounds;
     const tolerancePercent = 0.1; // 10% tolerance
+    let boundsCompatible = true;
     
     for (let i = 1; i < selectedGridData.length; i++) {
       const bounds = selectedGridData[i].bounds;
       const xTolerance = (firstBounds.xMax - firstBounds.xMin) * tolerancePercent;
       const yTolerance = (firstBounds.yMax - firstBounds.yMin) * tolerancePercent;
+      const zTolerance = (firstBounds.zMax - firstBounds.zMin) * tolerancePercent;
       
-      if (Math.abs(bounds.xMin - firstBounds.xMin) > xTolerance ||
-          Math.abs(bounds.xMax - firstBounds.xMax) > xTolerance ||
-          Math.abs(bounds.yMin - firstBounds.yMin) > yTolerance ||
-          Math.abs(bounds.yMax - firstBounds.yMax) > yTolerance) {
-        return { 
-          canCombine: false, 
-          reason: `Grid ${i + 1} has incompatible spatial bounds` 
-        };
+      const boundDiffs = {
+        xDiff: Math.max(
+          Math.abs(bounds.xMin - firstBounds.xMin),
+          Math.abs(bounds.xMax - firstBounds.xMax)
+        ),
+        yDiff: Math.max(
+          Math.abs(bounds.yMin - firstBounds.yMin),
+          Math.abs(bounds.yMax - firstBounds.yMax)
+        ),
+        zDiff: Math.max(
+          Math.abs(bounds.zMin - firstBounds.zMin),
+          Math.abs(bounds.zMax - firstBounds.zMax)
+        )
+      };
+      
+      if (boundDiffs.xDiff > xTolerance ||
+          boundDiffs.yDiff > yTolerance ||
+          boundDiffs.zDiff > zTolerance) {
+        boundsCompatible = false;
+        details.push(`Grid "${selectedGridData[i].name}" bounds mismatch: X diff ${boundDiffs.xDiff.toFixed(0)} (tol ${xTolerance.toFixed(0)}), Y diff ${boundDiffs.yDiff.toFixed(0)} (tol ${yTolerance.toFixed(0)}), Z diff ${boundDiffs.zDiff.toFixed(0)} (tol ${zTolerance.toFixed(0)})`);
       }
     }
     
-    return { canCombine: true, reason: 'Compatible grids' };
+    // Check layer count similarity
+    const layerCounts = selectedGridData.map(g => g.layerCount);
+    const maxLayerDiff = Math.max(...layerCounts) - Math.min(...layerCounts);
+    if (maxLayerDiff > 5) {
+      details.push(`Layer count variation too high: ${maxLayerDiff} (max diff allowed: 5)`);
+    }
+    
+    // Check point count similarity
+    const pointCounts = selectedGridData.map(g => g.pointCount);
+    const avgPoints = pointCounts.reduce((a, b) => a + b, 0) / pointCounts.length;
+    const pointVariance = pointCounts.reduce((sum, p) => sum + Math.abs(p - avgPoints) / avgPoints, 0) / pointCounts.length;
+    if (pointVariance > 0.3) {
+      details.push(`Point count variance too high: ${(pointVariance * 100).toFixed(0)}% (max 30%)`);
+    }
+    
+    // Overall compatibility
+    const canCombine = boundsCompatible && maxLayerDiff <= 5 && pointVariance <= 0.3;
+    
+    return { 
+      canCombine,
+      reason: canCombine ? 'Compatible grids' : 'Incompatible grids - see details',
+      details,
+      compatibilityScore: Math.round(100 - (details.length * 20)) // Simple score
+    };
   }, [grids]);
 
   // Enhanced grid combination with directional merging
@@ -384,7 +427,7 @@ const Geological3DGridTool = () => {
     const compatibility = canCombineGrids(gridIds);
     
     if (!compatibility.canCombine) {
-      alert(`Cannot combine grids: ${compatibility.reason}`);
+      alert(`Cannot combine grids: ${compatibility.reason}\n\nDetails:\n${compatibility.details.join('\n')}`);
       return;
     }
     
@@ -561,7 +604,7 @@ const Geological3DGridTool = () => {
     return { center: { x: gizmoX, y: gizmoY }, radius: size };
   }, [camera]);
 
-  // Enhanced 3D rendering with performance optimizations
+  // Enhanced 3D rendering with performance optimizations and slicing
   const renderAdvanced3D = useCallback(() => {
     if (!activeGrid || !canvasRef.current || !visualization) return;
     
@@ -611,9 +654,22 @@ const Geological3DGridTool = () => {
       };
     };
     
-    // Performance optimization: improved culling with larger margins
+    // Performance optimization: improved culling with larger margins and slicing
     const maxPoints = 15000; // Increased limit
-    const visiblePoints = activeGrid.points
+    const bounds = activeGrid.bounds;
+    const sliceXPos = bounds.xMin + (bounds.xMax - bounds.xMin) * slicePosition.x;
+    const sliceYPos = bounds.yMin + (bounds.yMax - bounds.yMin) * slicePosition.y;
+    const sliceZPos = bounds.zMin + (bounds.zMax - bounds.zMin) * slicePosition.z;
+    const sliceThickness = Math.max((bounds.xMax - bounds.xMin) * 0.02, 10); // 2% of range or min 10
+
+    let visiblePoints = activeGrid.points
+      .filter(point => {
+        // Apply slicing filters
+        if (sliceEnabled.x && Math.abs(point.x - sliceXPos) > sliceThickness) return false;
+        if (sliceEnabled.y && Math.abs(point.y - sliceYPos) > sliceThickness) return false;
+        if (sliceEnabled.z && Math.abs(point.z - sliceZPos) > sliceThickness) return false;
+        return true;
+      })
       .map(point => ({
         ...point,
         projected: project3D(point.x, point.y, point.z)
@@ -639,7 +695,7 @@ const Geological3DGridTool = () => {
     const gizmoInfo = render3DGizmo(ctx, width, height);
     gizmoRef.current = gizmoInfo;
     
-  }, [activeGrid, camera, visualization, viewMode, showFaults, showWells, colorScheme, pointColors, render3DGizmo]);
+  }, [activeGrid, camera, visualization, viewMode, showFaults, showWells, colorScheme, pointColors, render3DGizmo, sliceEnabled, slicePosition]);
 
   const getPointColor = useCallback((point) => {
     if (!showFaults && point.faultFlag > 0) return null;
@@ -834,6 +890,34 @@ const Geological3DGridTool = () => {
       ...prev,
       zoom: Math.max(0.1, Math.min(8, prev.zoom * zoomFactor))
     }));
+  }, []);
+
+  // Preset camera views
+  const setCameraPreset = useCallback((preset) => {
+    let newCamera;
+    switch (preset) {
+      case 'iso':
+        newCamera = { rotX: -20, rotY: 45, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      case 'top':
+        newCamera = { rotX: -90, rotY: 0, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      case 'bottom':
+        newCamera = { rotX: 90, rotY: 0, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      case 'front':
+        newCamera = { rotX: 0, rotY: 0, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      case 'side':
+        newCamera = { rotX: 0, rotY: 90, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      case 'back':
+        newCamera = { rotX: 0, rotY: 180, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+        break;
+      default:
+        newCamera = { rotX: -20, rotY: 45, rotZ: 0, zoom: 1, panX: 0, panY: 0 };
+    }
+    setCamera(newCamera);
   }, []);
 
   // Animation loop with RAF
@@ -1056,8 +1140,22 @@ const Geological3DGridTool = () => {
                     </div>
                   </div>
                   
-                  <div className="text-xs text-slate-300 mb-3">
-                    {canCombineGrids(Array.from(selectedGrids)).reason}
+                  {/* Enhanced Compatibility Details */}
+                  <div className="mb-3">
+                    <div className="text-xs text-slate-300 mb-1">Compatibility Score: {canCombineGrids(Array.from(selectedGrids)).compatibilityScore}%</div>
+                    <div className="text-xs text-slate-300">
+                      {canCombineGrids(Array.from(selectedGrids)).reason}
+                    </div>
+                    {canCombineGrids(Array.from(selectedGrids)).details.length > 0 && (
+                      <div className="mt-2 p-2 bg-red-900/20 rounded border border-red-700/30 text-xs text-red-300">
+                        Issues:
+                        <ul className="list-disc pl-4 mt-1">
+                          {canCombineGrids(Array.from(selectedGrids)).details.map((detail, idx) => (
+                            <li key={idx}>{detail}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {canCombineGrids(Array.from(selectedGrids)).canCombine && (
                       <div className="mt-1 text-purple-300">
                         {mergeDirection === 'vertical' ? 'Stacking grids vertically (Z-axis)' : 'Arranging grids horizontally (X-axis)'}
@@ -1212,6 +1310,41 @@ const Geological3DGridTool = () => {
                     Wells
                   </label>
                 </div>
+              </div>
+            </div>
+
+            {/* Slicing Section */}
+            <div className="p-4 border-b border-slate-700/30">
+              <h3 className="text-sm font-semibold mb-3 text-yellow-400 flex items-center">
+                <Box className="w-4 h-4 mr-2" />
+                Slicing Options
+              </h3>
+              
+              <div className="space-y-3">
+                {['x', 'y', 'z'].map(axis => (
+                  <div key={axis}>
+                    <label className="flex items-center text-xs mb-1">
+                      <input
+                        type="checkbox"
+                        checked={sliceEnabled[axis]}
+                        onChange={(e) => setSliceEnabled(prev => ({ ...prev, [axis]: e.target.checked }))}
+                        className="mr-2 text-yellow-500"
+                      />
+                      Slice {axis.toUpperCase()}-Axis
+                    </label>
+                    {sliceEnabled[axis] && (
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={slicePosition[axis]}
+                        onChange={(e) => setSlicePosition(prev => ({ ...prev, [axis]: parseFloat(e.target.value) }))}
+                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1410,6 +1543,21 @@ const Geological3DGridTool = () => {
                   <Home className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Camera Presets */}
+              <select
+                onChange={(e) => setCameraPreset(e.target.value)}
+                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs focus:border-blue-500 transition-colors"
+                value=""
+              >
+                <option value="" disabled>Camera Views</option>
+                <option value="iso">Isometric</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
+                <option value="front">Front</option>
+                <option value="side">Side</option>
+                <option value="back">Back</option>
+              </select>
               
               <button
                 onClick={() => setVisualization(!visualization)}
